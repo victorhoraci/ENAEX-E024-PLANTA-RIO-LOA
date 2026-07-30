@@ -31,7 +31,7 @@ import streamlit as st
 
 # Sello de versión del código. Cambia cada vez que se entrega una versión nueva.
 # Se muestra en la barra lateral para poder confirmar qué versión está desplegada.
-APP_VERSION = "2026-07-30 · criticidad B + leyendas"
+APP_VERSION = "2026-07-30c · criticidad B (fix caché)"
 
 # ==========================================================================
 # CONFIGURACIÓN DE LA PÁGINA  (debe ir antes que cualquier otro st.*)
@@ -5632,19 +5632,25 @@ def _portal_clave(pagina: str):
 
 
 def main():
+    # Si el código cambió de versión, limpiar la caché UNA vez. Esto evita el
+    # problema de que Streamlit siga sirviendo resultados calculados con la
+    # versión anterior (las funciones cacheadas no se invalidan solas cuando
+    # cambia una función interna que ellas llaman, como el cálculo de criticidad).
+    if st.session_state.get("_app_version") != APP_VERSION:
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+        st.session_state["_app_version"] = APP_VERSION
+
     with st.sidebar:
         st.markdown("### 📦 Panel MRP · Enaex")
+        st.caption(f"🧩 Versión **{APP_VERSION}**")
         eleccion = st.radio(
             "Ir a:", list(PAGINAS.keys()), label_visibility="collapsed"
         )
         st.markdown("---")
         _sidebar_acceso()
-        # Sello de versión: sirve para confirmar de un vistazo que el despliegue
-        # tomó la última versión del código. Si sube app.py y este texto no cambia,
-        # es que la app todavía corre el archivo anterior (falta reiniciarla/limpiar
-        # caché en Streamlit).
-        st.markdown("---")
-        st.caption(f"🧩 Versión **{APP_VERSION}**")
 
     # Control de acceso: las páginas que no son de acceso libre exigen la clave.
     if eleccion not in PAGINAS_LIBRES and not tiene_acceso_total():
