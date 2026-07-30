@@ -5335,7 +5335,7 @@ def pagina_cargar():
 | Excel | Transacción / origen | Layout / hoja | Cada cuánto | Al subirlo |
 |---|---|---|---|---|
 | **MB51** | MB51 | Layout **`/CALCDEMANDA`** ("MOV. PARA PRONOSTICO DE DEMANDA") | Semanal | **Reemplaza** |
-| **MB5B** | MB5B | Layout **`/CESBI ANALISIS DEMANDA CENTRO POWER BI`** | Mensual | **Se agrega** |
+| **MB5B** | MB5B | Columnas: Material · Descripción del material · De fecha · A fecha · Stock inicial · Total ctd.entrada mcía. · Total cantidades salida · Stock de cierre · Unidad medida base · Stock especial · **Centro** | Mensual | **Se agrega** |
 | **MRP semanal** | Planificacion_Simpl | Hoja `data` | Semanal | **Se agrega** (fecha en el nombre) |
 | **MM60** | MM60 | — | Mensual | **Reemplaza** |
 | **ME5A** | ME5A | — | Semanal | **Reemplaza** |
@@ -5388,10 +5388,14 @@ def pagina_cargar():
 
     autorizado = True
     if gh_password_configurada():
-        clave = st.text_input("🔒 Contraseña para cargar archivos", type="password")
-        autorizado = gh_password_ok(clave)
-        if not autorizado:
-            st.caption("Ingresa la contraseña para habilitar la carga.")
+        if tiene_acceso_total():
+            # Ya ingresó la clave al entrar al panel; no la pedimos otra vez.
+            autorizado = True
+        else:
+            clave = st.text_input("🔒 Contraseña para cargar archivos", type="password")
+            autorizado = gh_password_ok(clave)
+            if not autorizado:
+                st.caption("Ingresa la contraseña para habilitar la carga.")
     else:
         st.caption("⚠️ No hay contraseña configurada (`APP_PASSWORD` en los secrets).")
 
@@ -5403,7 +5407,10 @@ def pagina_cargar():
         ("MB51 — movimientos (Demanda)", "MB51", CARPETA_MB51, True,
          "MB51 LAYOUT / CALCDEMANDA (movimientos para el pronóstico de demanda)."),
         ("MB5B — stock del mes (Demanda)", "MB5B", CARPETA_MB5B, False,
-         "MB5B LAYOUT / CESBI ANALISIS DEMANDA CENTRO POWER BI "),
+         "MB5B LAYOUT. Armar SIEMPRE en este orden de columnas: Material · "
+         "Descripción del material · De fecha · A fecha · Stock inicial · "
+         "Total ctd.entrada mcía. · Total cantidades salida · Stock de cierre · "
+         "Unidad medida base · Stock especial · Centro."),
         ("MRP semanal — Planificacion_Simpl", "MRP", CARPETA_MRP, False,
          "Se ingresa el Excel de Planificación SIMPL. Debe traer la fecha en el "
          "nombre (ej. Planificacion_Simpl_-_Prillex_08072026.xlsx)."),
@@ -5560,6 +5567,56 @@ PAGINAS = {
 }
 
 
+# Páginas de ACCESO LIBRE (no piden contraseña). El resto exige la clave.
+PAGINAS_LIBRES = {"🚚  MRP E002", "💰  Costos"}
+
+
+def tiene_acceso_total() -> bool:
+    """
+    True si el usuario ya ingresó la contraseña en esta sesión.
+    Si no hay contraseña configurada (APP_PASSWORD), no se puede bloquear, así
+    que se permite todo (para no dejar la app inutilizable).
+    """
+    if not gh_password_configurada():
+        return True
+    return bool(st.session_state.get("acceso_total", False))
+
+
+def _sidebar_acceso():
+    """Muestra en la barra lateral el estado de acceso y el botón de salir."""
+    if not gh_password_configurada():
+        return
+    if tiene_acceso_total():
+        st.caption("🔓 Acceso completo habilitado")
+        if st.button("Cerrar sesión", use_container_width=True):
+            st.session_state["acceso_total"] = False
+            st.rerun()
+    else:
+        st.caption("🔒 Acceso libre: **MRP E002** y **Costos**")
+        st.caption("El resto pide contraseña.")
+
+
+def _portal_clave(pagina: str):
+    """Pantalla que pide la contraseña para las visualizaciones protegidas."""
+    st.markdown(
+        '<div class="hdr hdr-azul"><h1>🔒 Acceso restringido</h1>'
+        '<p>Esta visualización requiere contraseña</p></div>',
+        unsafe_allow_html=True,
+    )
+    st.info(f"La visualización **{pagina}** requiere contraseña.\n\n"
+            "Las páginas **🚚 MRP E002** y **💰 Costos** son de acceso libre; "
+            "puedes ir a ellas desde el menú de la izquierda sin clave.")
+    clave = st.text_input("Contraseña", type="password", key="clave_acceso")
+    if clave:
+        if gh_password_ok(clave):
+            st.session_state["acceso_total"] = True
+            st.rerun()
+        else:
+            st.error("Contraseña incorrecta. Inténtalo de nuevo.")
+    st.caption("Ingresa la contraseña para desbloquear el resto de las "
+               "visualizaciones durante esta sesión.")
+
+
 def main():
     with st.sidebar:
         st.markdown("### 📦 Panel MRP · Enaex")
@@ -5567,6 +5624,12 @@ def main():
             "Ir a:", list(PAGINAS.keys()), label_visibility="collapsed"
         )
         st.markdown("---")
+        _sidebar_acceso()
+
+    # Control de acceso: las páginas que no son de acceso libre exigen la clave.
+    if eleccion not in PAGINAS_LIBRES and not tiene_acceso_total():
+        _portal_clave(eleccion)
+        return
 
     try:
         PAGINAS[eleccion]()
