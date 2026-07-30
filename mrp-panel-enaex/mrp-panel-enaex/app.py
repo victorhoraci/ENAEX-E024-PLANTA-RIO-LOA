@@ -29,6 +29,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+# Sello de versión del código. Cambia cada vez que se entrega una versión nueva.
+# Se muestra en la barra lateral para poder confirmar qué versión está desplegada.
+APP_VERSION = "2026-07-30 · criticidad B + leyendas"
+
 # ==========================================================================
 # CONFIGURACIÓN DE LA PÁGINA  (debe ir antes que cualquier otro st.*)
 # ==========================================================================
@@ -5635,6 +5639,12 @@ def main():
         )
         st.markdown("---")
         _sidebar_acceso()
+        # Sello de versión: sirve para confirmar de un vistazo que el despliegue
+        # tomó la última versión del código. Si sube app.py y este texto no cambia,
+        # es que la app todavía corre el archivo anterior (falta reiniciarla/limpiar
+        # caché en Streamlit).
+        st.markdown("---")
+        st.caption(f"🧩 Versión **{APP_VERSION}**")
 
     # Control de acceso: las páginas que no son de acceso libre exigen la clave.
     if eleccion not in PAGINAS_LIBRES and not tiene_acceso_total():
